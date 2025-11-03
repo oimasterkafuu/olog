@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+main {
+  scroll-margin-top: 4rem;
+}
+
+.markdown-content {
+  color: #0f172a;
+  line-height: 1.7;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin-top: 1.8rem;
+  margin-bottom: 0.8rem;
+  font-weight: 700;
+}
+
+.markdown-content p {
+  margin-top: 1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid #cbd5f5;
+  color: #475569;
+  font-style: italic;
+}
+
+.markdown-content pre {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.markdown-content code {
+  background: rgba(15, 23, 42, 0.08);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+}
+
+.markdown-content img,
+.markdown-content video,
+.markdown-content iframe,
+.markdown-content canvas,
+.markdown-content svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem auto;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.markdown-content table thead {
+  background: #e2e8f0;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  padding: 0.75rem 1rem;
+  border: 1px solid #cbd5f5;
+  text-align: left;
+}

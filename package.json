@@ -1,0 +1,52 @@
+{
+  "name": "olog",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:reset": "prisma migrate reset --force",
+    "test": "vitest"
+  },
+  "packageManager": "pnpm@10.12.1",
+  "dependencies": {
+    "@prisma/client": "^6.16.3",
+    "@uiw/react-markdown-preview": "^5.1.5",
+    "@uiw/react-md-editor": "^4.0.8",
+    "bcrypt": "^6.0.0",
+    "highlight.js": "^11.11.1",
+    "iron-session": "^8.0.4",
+    "mime-types": "^3.0.1",
+    "next": "^14.2.33",
+    "openai": "^6.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/mime-types": "^2.1.4",
+    "@types/node": "^24.7.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.5.4",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "prisma": "^6.16.3",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AIReviewKind {
+  PUBLISH_METADATA
+  SUMMARY
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Post {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  contentMd   String
+  summary     String?
+  coverUrl    String?
+  status      PostStatus @default(DRAFT)
+  publishedAt DateTime?
+  seriesId    String?
+  autoSummary Boolean    @default(true)
+  hidden      Boolean    @default(false)
+  metaJson    Json
+  assetHashes Json
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  series      Series?    @relation(fields: [seriesId], references: [id])
+  aiReviews   AIReview[]
+}
+
+model Series {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+  hidden      Boolean @default(false)
+  orderJson   Json
+  posts       Post[]
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  sha256    String   @unique
+  ext       String
+  mime      String
+  size      Int
+  path      String
+  refCount  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AIReview {
+  id           String       @id @default(cuid())
+  postId       String
+  kind         AIReviewKind
+  model        String
+  prompt       String?
+  inputHash    String
+  ok           Boolean      @default(true)
+  errorMessage String?
+  outputJson   Json?
+  rawText      String?
+  tokenUsage   Int
+  /// 费用估算（存储为浮点数，SQLite 不支持 Decimal）
+  cost         Float?
+  createdAt    DateTime     @default(now())
+  post         Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Config {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,10 @@
+-- CreateTable
+CREATE TABLE "Config" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Config_key_key" ON "Config"("key");

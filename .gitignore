@@ -13,6 +13,7 @@ public/uploads/*
 !public/uploads/.gitkeep
 
 prisma/dev.db
+prisma/prisma/
 .test-data/
 
 # Logs

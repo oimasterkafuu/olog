@@ -424,6 +424,41 @@ className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mediu
 5. **禁止自定义颜色**：使用 Tailwind 预设的 Slate 色系
 6. **禁止不一致的圆角**：统一使用 `rounded`（按钮/输入框）或 `rounded-lg`（卡片）
 
+#### 交互与反馈设计原则
+
+**提示信息位置规范：**
+- 成功/错误/警告提示应显示在触发操作的按钮组右侧，作为按钮组的一部分
+- 禁止在页面顶部或独立区域显示提示信息，避免视觉割裂
+- 提示信息应使用 `flex-wrap` 布局，在窄屏时自动换行
+- 提示文本样式：成功 `text-green-600`，错误 `text-red-600`，字号 `text-sm`
+
+**示例（正确）：**
+```tsx
+<div className="flex flex-wrap items-center gap-3">
+  <button type="submit" className="...">保存</button>
+  <button type="button" className="...">取消</button>
+  {error && <p className="text-sm text-red-600">{error}</p>}
+  {success && <p className="text-sm text-green-600">{success}</p>}
+</div>
+```
+
+**示例（错误）：**
+```tsx
+{/* 不要这样做 - 提示信息独立在上方 */}
+{message && <div className="rounded-lg border p-3">...</div>}
+
+<div className="flex gap-3">
+  <button>保存</button>
+  <button>取消</button>
+</div>
+```
+
+**布局稳定性原则：**
+- 避免提示信息的出现/消失导致页面布局抖动
+- 使用内联提示（inline feedback）而非块级提示
+- 自动保存等状态提示不应改变页面高度
+- 关键操作的反馈应靠近操作按钮，保持视觉连贯性
+
 #### 一致性检查清单
 
 新增或修改页面时，确保：
@@ -435,6 +470,9 @@ className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mediu
 - [ ] 提示信息使用灰色系而非彩色背景
 - [ ] 状态徽章仅在必要时使用绿色/黄色，且仅限状态标识
 - [ ] 整体配色不超出黑白灰 + 少量状态色的范围
+- [ ] 成功/错误提示显示在按钮组右侧，使用 `text-green-600` 或 `text-red-600`
+- [ ] 按钮组使用 `flex flex-wrap items-center gap-3` 布局
+- [ ] 避免提示信息的出现/消失导致页面布局变化
 
 
 ## 9. 代码组织与约定

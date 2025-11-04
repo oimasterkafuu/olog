@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAutoSave } from "@/hooks/use-auto-save";
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 
 type Mode = "create" | "edit";
 
@@ -38,8 +40,39 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // 自动保存草稿（仅在新建模式启用）
+  const draftData = mode === "create" ? {
+    title,
+    slug,
+    description,
+    hidden,
+    orderIds,
+  } : null;
+
+  const { savedData, clearSaved } = mode === "create"
+    ? useAutoSave("draft-series-new", draftData!)
+    : { savedData: null, clearSaved: () => {} };
+
+  // 初始化时恢复草稿（仅新建模式）
+  useEffect(() => {
+    if (savedData && mode === "create") {
+      // 仅在新建模式且表单为空时恢复
+      if (!title && !slug) {
+        setTitle(savedData.title || "");
+        setSlug(savedData.slug || "");
+        setDescription(savedData.description || "");
+        setHidden(savedData.hidden ?? false);
+        if (Array.isArray(savedData.orderIds)) {
+          setOrderIds(savedData.orderIds);
+        }
+      }
+    }
+  }, [savedData, mode, title, slug]);
+
+  const handleSubmit = useCallback(async (event?: React.FormEvent<HTMLFormElement>) => {
+    if (event) {
+      event.preventDefault();
+    }
     if (loading) return;
 
     if (!title.trim() || !slug.trim()) {
@@ -67,6 +100,10 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
         if (!res.ok || !data.ok) {
           setError(data.error ?? "创建失败");
           return;
+        }
+        // 清除自动保存的草稿（仅新建模式）
+        if (mode === "create") {
+          clearSaved();
         }
         router.push(`/admin/series/${data.data.id}`);
         router.refresh();
@@ -96,7 +133,14 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mode, loading, title, slug, description, hidden, orderIds, series?.id, router, clearSaved]);
+
+  // 快捷键 Ctrl/Cmd+S 保存
+  useKeyboardShortcut('KeyS', () => {
+    if (!loading) {
+      handleSubmit();
+    }
+  }, { ctrl: true, meta: true });
 
   const movePost = (id: string, direction: "up" | "down") => {
     setOrderIds((prev) => {
@@ -219,10 +263,7 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">{success}</p>}
-
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
@@ -237,6 +278,8 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
         >
           返回列表
         </button>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {success && <p className="text-sm text-green-600">{success}</p>}
       </div>
     </form>
   );

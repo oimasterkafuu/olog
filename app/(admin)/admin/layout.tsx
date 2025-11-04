@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { name: "仪表盘", href: "/admin" },
   { name: "文章管理", href: "/admin/posts" },
   { name: "系列管理", href: "/admin/series" },
+  { name: "附件管理", href: "/admin/attachments" },
   { name: "AI 调用记录", href: "/admin/ai-reviews" },
   { name: "系统配置", href: "/admin/config" },
 ];

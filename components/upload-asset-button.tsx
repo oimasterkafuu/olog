@@ -4,11 +4,12 @@ import { useState, useRef } from "react";
 
 interface UploadAssetButtonProps {
   postId?: string;
-  onUploaded: (asset: { sha256: string; path: string; mime: string; size: number }) => void;
+  onUploaded?: (asset: { sha256: string; path: string; mime: string; size: number }) => void;
+  onFileSelected?: (file: File) => void;
   disabled?: boolean;
 }
 
-export function UploadAssetButton({ postId, onUploaded, disabled = false }: UploadAssetButtonProps) {
+export function UploadAssetButton({ postId, onUploaded, onFileSelected, disabled = false }: UploadAssetButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +24,17 @@ export function UploadAssetButton({ postId, onUploaded, disabled = false }: Uplo
     const file = event.target.files?.[0];
     if (!file) return;
     setError("");
+    
+    // 如果提供了 onFileSelected 回调（创建模式），直接返回文件
+    if (onFileSelected) {
+      onFileSelected(file);
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+      return;
+    }
+    
+    // 否则上传到服务器（编辑模式）
     setLoading(true);
     try {
       const form = new FormData();
@@ -36,7 +48,9 @@ export function UploadAssetButton({ postId, onUploaded, disabled = false }: Uplo
         setError(data.error ?? "上传失败");
         return;
       }
-      onUploaded(data.data);
+      if (onUploaded) {
+        onUploaded(data.data);
+      }
     } catch (err) {
       console.error(err);
       setError("上传过程中出现错误");
@@ -67,11 +81,6 @@ export function UploadAssetButton({ postId, onUploaded, disabled = false }: Uplo
         {loading ? "上传中..." : "上传图片"}
       </button>
       {error && <span className="text-xs text-red-600">{error}</span>}
-      {!postId && (
-        <span className="text-xs text-slate-500">
-          保存文章后可自动绑定附件，当前上传仅保存文件。
-        </span>
-      )}
     </div>
   );
 }

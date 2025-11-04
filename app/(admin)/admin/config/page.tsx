@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 
 interface ConfigValues {
   OPENAI_API_KEY: string;
@@ -43,8 +44,10 @@ export default function ConfigPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     setSaving(true);
     setMessage(null);
 
@@ -101,7 +104,14 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [formData, apiKeyChanged, configs]);
+
+  // 快捷键 Ctrl/Cmd+S 保存
+  useKeyboardShortcut('KeyS', () => {
+    if (!saving) {
+      handleSubmit();
+    }
+  }, { ctrl: true, meta: true });
 
   if (loading) {
     return (
@@ -123,18 +133,6 @@ export default function ConfigPage() {
         <h1 className="text-2xl font-semibold text-slate-900">系统配置</h1>
         <p className="mt-1 text-sm text-slate-500">管理 AI 服务、站点 URL 等系统级配置，修改后立即生效。</p>
       </div>
-      
-      {message && (
-        <div
-          className={`rounded-lg border p-3 text-sm ${
-            message.type === "success"
-              ? "border-slate-200 bg-slate-50 text-slate-700"
-              : "border-slate-300 bg-slate-100 text-slate-800"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
 
       <div className="rounded-lg border border-slate-200 bg-white p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -230,7 +228,7 @@ export default function ConfigPage() {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-wrap items-center gap-3 pt-4">
             <button
               type="submit"
               disabled={saving}
@@ -247,6 +245,12 @@ export default function ConfigPage() {
             >
               重置
             </button>
+            
+            {message && (
+              <p className={`text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                {message.text}
+              </p>
+            )}
           </div>
         </form>
       </div>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { LogoutButton } from "@/components/logout-button";
 import { NavLink } from "@/components/nav-link";
+import { MobileNav } from "@/components/mobile-nav";
 
 interface NavItem {
   name: string;
@@ -44,19 +45,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-          <div>
-            <p className="text-base font-semibold">后台</p>
-            <p className="text-xs text-slate-500">{session.username}</p>
+          <div className="flex items-center gap-3">
+            <MobileNav navItems={navItems} />
+            <div>
+              <p className="text-base font-semibold">后台</p>
+              <p className="text-xs text-slate-500">{session.username}</p>
+            </div>
           </div>
           <LogoutButton />
         </header>
-        <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 md:hidden">
-          {navItems.map((item) => (
-            <NavLink key={item.href} href={item.href}>
-              {item.name}
-            </NavLink>
-          ))}
-        </nav>
         <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
     </div>

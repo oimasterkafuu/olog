@@ -25,6 +25,7 @@ interface MdEditorResponsiveProps {
   mobileHeight?: number;
   previewOptions?: MDEditorProps["previewOptions"];
   textareaProps?: MDEditorProps["textareaProps"];
+  onImagePaste?: (file: File) => void;
 }
 
 export function MdEditorResponsive({
@@ -36,6 +37,7 @@ export function MdEditorResponsive({
   mobileHeight = 360,
   previewOptions,
   textareaProps,
+  onImagePaste,
 }: MdEditorResponsiveProps) {
   const isMobile = useIsMobile();
   const [mode, setMode] = useState<EditorMode>("live");
@@ -60,9 +62,48 @@ export function MdEditorResponsive({
       rehypePlugins: [rehypeSanitize, rehypeHighlight],
     } satisfies NonNullable<MDEditorProps["previewOptions"]>);
 
+  // 处理粘贴事件
+  const handlePaste = (event: React.ClipboardEvent) => {
+    if (!onImagePaste || disabled) return;
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          event.preventDefault();
+          onImagePaste(file);
+        }
+        break;
+      }
+    }
+  };
+
+  // 处理拖拽事件
+  const handleDrop = (event: React.DragEvent) => {
+    if (!onImagePaste || disabled) return;
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type.startsWith('image/')) {
+        event.preventDefault();
+        onImagePaste(file);
+        break;
+      }
+    }
+  };
+
   const mergedTextareaProps = {
     ...textareaProps,
     readOnly: disabled ? true : textareaProps?.readOnly,
+    onPaste: handlePaste,
+    onDrop: handleDrop,
   } satisfies NonNullable<MDEditorProps["textareaProps"]>;
 
   const controls: { label: string; value: EditorMode; hiddenOnMobile?: boolean }[] = [

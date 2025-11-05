@@ -27,6 +27,26 @@ jobs:
           script: |
             set -e
             
+            echo "==> 加载环境变量"
+            # 加载用户环境配置以获取 pnpm 等工具的 PATH
+            if [ -f ~/.bashrc ]; then
+              source ~/.bashrc
+            fi
+            if [ -f ~/.profile ]; then
+              source ~/.profile
+            fi
+            if [ -f ~/.zshrc ]; then
+              source ~/.zshrc
+            fi
+            
+            # 添加常见的 pnpm 路径
+            export PATH="$HOME/.local/share/pnpm:$PATH"
+            export PATH="$HOME/.npm-global/bin:$PATH"
+            export PATH="/usr/local/bin:$PATH"
+            
+            echo "==> 验证 pnpm"
+            which pnpm || echo "警告：未找到 pnpm 命令"
+            
             echo "==> 进入项目目录"
             cd ~/olog
             

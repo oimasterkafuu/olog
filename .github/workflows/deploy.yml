@@ -1,0 +1,71 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Extract SSH credentials
+        id: ssh_creds
+        run: |
+          SSH_USER_HOST="${{ secrets.SSH_USER_HOST }}"
+          echo "username=${SSH_USER_HOST%@*}" >> $GITHUB_OUTPUT
+          echo "host=${SSH_USER_HOST#*@}" >> $GITHUB_OUTPUT
+      
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ steps.ssh_creds.outputs.host }}
+          username: ${{ steps.ssh_creds.outputs.username }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            
+            echo "==> 进入项目目录"
+            cd ~/olog
+            
+            echo "==> 停止现有 Next.js 进程"
+            # 查找并终止占用 3000 端口的进程
+            if lsof -ti:3000 > /dev/null 2>&1; then
+              echo "发现运行中的进程，正在终止..."
+              lsof -ti:3000 | xargs kill -9 || true
+              sleep 2
+            else
+              echo "未发现运行中的进程"
+            fi
+            
+            echo "==> 拉取最新代码"
+            git pull origin main
+            
+            echo "==> 安装依赖"
+            pnpm install
+            
+            echo "==> 运行数据库迁移"
+            pnpm prisma migrate deploy
+            
+            echo "==> 构建项目"
+            pnpm build
+            
+            echo "==> 创建日志目录"
+            mkdir -p ~/olog/logs
+            
+            echo "==> 后台启动服务"
+            nohup pnpm start > ~/olog/logs/output.log 2>&1 &
+            
+            echo "==> 等待服务启动"
+            sleep 5
+            
+            echo "==> 检查服务状态"
+            if lsof -ti:3000 > /dev/null 2>&1; then
+              echo "✓ 部署成功，服务已启动"
+            else
+              echo "✗ 警告：服务可能未成功启动，请检查日志"
+              exit 1
+            fi
+

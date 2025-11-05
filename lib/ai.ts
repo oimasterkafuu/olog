@@ -20,7 +20,7 @@ const SYSTEM_PROMPT_METADATA = `你是中文技术博客的编辑助手。仅以
 
 const SYSTEM_PROMPT_SUMMARY = `你是中文技术写作编辑。仅以 JSON 对象输出结果，字段必须齐全且可被机器解析。
 任务：
-生成单段中文摘要（80–150 字），允许使用 Markdown 粗体以强调重点，以及单行嵌套公式（尽量减少使用公式；如果需要，使用单个$包裹），但禁止列表、禁止多段、禁止换行。
+生成单段中文摘要（80–150 字），允许使用 Markdown 格式，但禁止列表、禁止多段、禁止换行。
 输出：{"summary": string}`;
 
 const COMMON_CHAT_PARAMS = {
@@ -101,6 +101,74 @@ function ensureString(value: unknown, field: string): string {
 
 function hashInput(payload: unknown): string {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+/**
+ * 从文本中提取最大的 JSON 对象（大括号对）
+ * 用于容错处理 AI 返回的带有额外文本的 JSON 响应
+ * 
+ * 示例：
+ * - 输入: '这是一个 JSON: {"key": "value"}'
+ *   输出: '{"key": "value"}'
+ * 
+ * - 输入: '{"key": "value"} 这是说明文本'
+ *   输出: '{"key": "value"}'
+ * 
+ * - 输入: '{"a": {"nested": "object"}, "b": "value"}'
+ *   输出: '{"a": {"nested": "object"}, "b": "value"}'
+ * 
+ * - 输入: '{"key": "包含 { 和 } 的字符串"}'
+ *   输出: '{"key": "包含 { 和 } 的字符串"}'
+ * 
+ * @throws {Error} 如果未找到有效的 JSON 对象
+ */
+function extractLargestJsonObject(text: string): string {
+  // 找到第一个 {
+  const firstBrace = text.indexOf("{");
+  if (firstBrace === -1) {
+    throw new Error("未找到 JSON 对象起始标记");
+  }
+
+  // 从第一个 { 开始，通过括号计数找到匹配的 }
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = firstBrace; i < text.length; i++) {
+    const char = text[i];
+
+    // 处理转义字符
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escapeNext = true;
+      continue;
+    }
+
+    // 处理字符串边界（忽略字符串内的括号）
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    // 只在非字符串内统计括号
+    if (!inString) {
+      if (char === "{") {
+        depth++;
+      } else if (char === "}") {
+        depth--;
+        // 找到匹配的结束括号
+        if (depth === 0) {
+          return text.substring(firstBrace, i + 1);
+        }
+      }
+    }
+  }
+
+  throw new Error("未找到匹配的 JSON 对象结束标记");
 }
 
 export interface AIErrorContext {
@@ -272,7 +340,7 @@ export async function callPublishMetadata(input: PublishMetadataInput): Promise<
   const userContent = JSON.stringify(payload);
   const prompt = `${SYSTEM_PROMPT_METADATA}\n\n${userContent}`;
   const inputHash = hashInput(payload);
-  const model = (await getConfig("MODEL_NAME")) || "THUDM/GLM-4-32B-0414";
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
 
   const completion = await requestChatCompletion({
     model,
@@ -293,7 +361,9 @@ export async function callPublishMetadata(input: PublishMetadataInput): Promise<
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(content) as Record<string, unknown>;
+    // 尝试提取最大的 JSON 对象，容错处理带有额外文本的响应
+    const jsonText = extractLargestJsonObject(content);
+    parsed = JSON.parse(jsonText) as Record<string, unknown>;
   } catch (error) {
     attachAIContext(error, {
       model,
@@ -351,7 +421,7 @@ export async function callSummary(input: SummaryInput): Promise<SummaryCallResul
   const userContent = JSON.stringify(payload);
   const prompt = `${SYSTEM_PROMPT_SUMMARY}\n\n${userContent}`;
   const inputHash = hashInput(payload);
-  const model = (await getConfig("MODEL_NAME")) || "THUDM/GLM-4-32B-0414";
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
 
   const completion = await requestChatCompletion({
     model,
@@ -372,7 +442,9 @@ export async function callSummary(input: SummaryInput): Promise<SummaryCallResul
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(content) as Record<string, unknown>;
+    // 尝试提取最大的 JSON 对象，容错处理带有额外文本的响应
+    const jsonText = extractLargestJsonObject(content);
+    parsed = JSON.parse(jsonText) as Record<string, unknown>;
   } catch (error) {
     attachAIContext(error, {
       model,

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { PostEditWorkspace } from "@/components/post-edit-workspace";
 import { MarkdownViewer } from "@/components/markdown-viewer";
+import { RegenerateSummaryButton } from "@/components/regenerate-summary-button";
 
 export const metadata = {
   title: "编辑文章",
@@ -97,13 +98,16 @@ export default async function EditPostPage({ params }: { params: { id: string } 
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-lg font-medium text-slate-900">AI 摘要</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-medium text-slate-900">AI 摘要</h2>
+            <RegenerateSummaryButton postId={post.id} />
+          </div>
           {post.summary ? (
-            <div className="mt-2">
+            <div className="mt-3">
               <MarkdownViewer content={post.summary} className="prose prose-sm max-w-none text-slate-700" />
             </div>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">暂无摘要，发布时可自动生成。</p>
+            <p className="mt-3 text-sm text-slate-500">暂无摘要，发布时可自动生成或点击右侧按钮手动生成。</p>
           )}
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">

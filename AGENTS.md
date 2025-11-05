@@ -12,7 +12,7 @@
 - 鉴权：用户名+密码，会话基于 `iron-session`；无需复杂权限模型与角色管理。
 - 文章编辑：Markdown；发布时可选择是否生成摘要（默认开启）。
 - AI 协作：
-  - 元数据关键词提取与摘要生成统一调用 AI 模型（默认 THUDM/GLM-4-32B-0414），按业务场景区分"发布元数据""摘要生成"两类流程。
+  - 元数据关键词提取与摘要生成统一调用 AI 模型（默认 Qwen/Qwen3-235B-A22B-Instruct-2507），按业务场景区分"发布元数据""摘要生成"两类流程。
   - 两类调用均记录至 AIReview，包含模型、用量与成本估算。
   - AI 相关配置（API Key、Base URL、模型名称、费率）存储在数据库中，支持后台管理界面修改。
 - 文本格式化：使用 pangu 自动在中英文间添加空格，发布时应用于正文。
@@ -185,7 +185,7 @@
 - 严格返回 JSON 对象，不包含多余文本。
 - 部分模型不可靠支持 system prompt，需将提示词与输入上下文拼接在同一个 user 消息内。
 - 统一采样参数：`temperature=0.7`、`top_p=0.7`、`frequency_penalty=0.3`、`top_k=50`；发布元数据阶段 `max_tokens=8192`，摘要阶段 `max_tokens=8192`。
-- 默认模型：THUDM/GLM-4-32B-0414（可通过后台配置修改）。
+- 默认模型：Qwen/Qwen3-235B-A22B-Instruct-2507（可通过后台配置修改）。
 
 元数据处理：关键词提取
 
@@ -525,9 +525,9 @@ className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mediu
 - `OPENAI_API_KEY`：AI 服务访问密钥。
 - `OPENAI_BASE_URL`：兼容 OpenAI 协议的服务端地址，示例：`https://api.siliconflow.cn/v1`
 - `SITE_URL`：站点根地址（用于绝对链接、OG/RSS）。
-- `MODEL_NAME`：AI 模型名称，默认 `THUDM/GLM-4-32B-0414`。
-- `RATE_AI_INPUT`：AI 输入费率（元/百万 tokens），默认 `0.27`。
-- `RATE_AI_OUTPUT`：AI 输出费率（元/百万 tokens），默认 `0.27`。
+- `MODEL_NAME`：AI 模型名称，默认 `Qwen/Qwen3-235B-A22B-Instruct-2507`。
+- `RATE_AI_INPUT`：AI 输入费率（美元/百万 tokens），默认 `0.09`。
+- `RATE_AI_OUTPUT`：AI 输出费率（美元/百万 tokens），默认 `0.6`。
 
 `.env.example` 建议内容：
 ```
@@ -537,9 +537,9 @@ OPENAI_BASE_URL=https://api.siliconflow.cn/v1
 IRON_SESSION_PASSWORD=please_change_to_a_long_random_string
 SITE_URL=http://localhost:3000
 
-MODEL_NAME=THUDM/GLM-4-32B-0414
-RATE_AI_INPUT=0.27
-RATE_AI_OUTPUT=0.27
+MODEL_NAME=Qwen/Qwen3-235B-A22B-Instruct-2507
+RATE_AI_INPUT=0.09
+RATE_AI_OUTPUT=0.6
 ```
 
 ### 11.3 配置管理
@@ -592,7 +592,7 @@ RATE_AI_OUTPUT=0.27
 
 元数据处理：
 ```
-const model = await getConfig('MODEL_NAME') || 'THUDM/GLM-4-32B-0414'
+const model = await getConfig('MODEL_NAME') || 'Qwen/Qwen3-235B-A22B-Instruct-2507'
 const prompt = `${SYSTEM_PROMPT_METADATA}\n\n${JSON.stringify({ title, markdown, maxKeywords: 10 })}`
 const res = await fetch(chatCompletionEndpoint, {
   method: 'POST',
@@ -616,7 +616,7 @@ const formattedMarkdown = pangu.spacingText(markdown)
 
 摘要生成：
 ```
-const model = await getConfig('MODEL_NAME') || 'THUDM/GLM-4-32B-0414'
+const model = await getConfig('MODEL_NAME') || 'Qwen/Qwen3-235B-A22B-Instruct-2507'
 const prompt = `${SYSTEM_PROMPT_SUMMARY}\n\n${JSON.stringify({ title, markdown })}`
 // 类似调用方式
 // 解析 JSON：{ summary }

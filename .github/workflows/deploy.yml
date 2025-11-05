@@ -28,24 +28,17 @@ jobs:
             set -e
             
             echo "==> 加载环境变量"
-            # 加载用户环境配置以获取 pnpm 等工具的 PATH
+            # 加载用户环境配置
             if [ -f ~/.bashrc ]; then
               source ~/.bashrc
             fi
             if [ -f ~/.profile ]; then
               source ~/.profile
             fi
-            if [ -f ~/.zshrc ]; then
-              source ~/.zshrc
-            fi
             
-            # 添加常见的 pnpm 路径
-            export PATH="$HOME/.local/share/pnpm:$PATH"
-            export PATH="$HOME/.npm-global/bin:$PATH"
-            export PATH="/usr/local/bin:$PATH"
-            
-            echo "==> 验证 pnpm"
-            which pnpm || echo "警告：未找到 pnpm 命令"
+            echo "==> 验证 Node.js 和 npm"
+            node --version
+            npm --version
             
             echo "==> 进入项目目录"
             cd ~/olog
@@ -64,19 +57,19 @@ jobs:
             git pull origin main
             
             echo "==> 安装依赖"
-            pnpm install
+            npm install
             
             echo "==> 运行数据库迁移"
-            pnpm prisma migrate deploy
+            npx prisma migrate deploy
             
             echo "==> 构建项目"
-            pnpm build
+            npm run build
             
             echo "==> 创建日志目录"
             mkdir -p ~/olog/logs
             
             echo "==> 后台启动服务"
-            nohup pnpm start > ~/olog/logs/output.log 2>&1 &
+            nohup npm run start > ~/olog/logs/output.log 2>&1 &
             
             echo "==> 等待服务启动"
             sleep 5

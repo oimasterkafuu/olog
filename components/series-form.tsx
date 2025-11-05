@@ -49,8 +49,12 @@ export function SeriesForm({ mode, series, posts = [] }: SeriesFormProps) {
     orderIds,
   } : null;
 
+  const autoSaveResult = useAutoSave(
+    "draft-series-new",
+    mode === "create" ? draftData! : null
+  );
   const { savedData, clearSaved } = mode === "create"
-    ? useAutoSave("draft-series-new", draftData!)
+    ? autoSaveResult
     : { savedData: null, clearSaved: () => {} };
 
   // 初始化时恢复草稿（仅新建模式）

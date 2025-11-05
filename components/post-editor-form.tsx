@@ -65,8 +65,12 @@ export function PostEditorForm({ mode, post, seriesOptions, disabled = false }: 
     seriesId,
   } : null;
 
+  const autoSaveResult = useAutoSave(
+    "draft-post-new", 
+    mode === "create" ? draftData! : null
+  );
   const { savedData, clearSaved } = mode === "create" 
-    ? useAutoSave("draft-post-new", draftData!)
+    ? autoSaveResult
     : { savedData: null, clearSaved: () => {} };
 
   // 初始化时恢复草稿（仅新建模式）
@@ -293,7 +297,7 @@ export function PostEditorForm({ mode, post, seriesOptions, disabled = false }: 
     } finally {
       setLoading(false);
     }
-  }, [mode, disabled, title, content, autoSummary, hidden, seriesId, slug, post?.id, pendingImages, router, clearSaved]);
+  }, [mode, disabled, title, content, autoSummary, hidden, seriesId, slug, post?.id, pendingImages, router, clearSaved, uploadPendingImages]);
 
   // 快捷键 Ctrl/Cmd+S 保存
   useKeyboardShortcut('KeyS', () => {

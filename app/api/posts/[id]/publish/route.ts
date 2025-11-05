@@ -129,7 +129,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               errorMessage: summaryWarning,
               rawText: ctx.rawText ?? null,
               tokenUsage: ctx.usage?.total_tokens ?? 0,
-              cost: calcCostForAI(ctx.usage ?? {}) ?? undefined,
+              cost: (await calcCostForAI(ctx.usage ?? {})) ?? undefined,
             },
           });
         } catch (logError) {

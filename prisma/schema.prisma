@@ -42,6 +42,7 @@ model Post {
   updatedAt   DateTime   @updatedAt
   series      Series?    @relation(fields: [seriesId], references: [id])
   aiReviews   AIReview[]
+  revisions   Revision[]
 }
 
 model Series {
@@ -89,4 +90,14 @@ model Config {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model Revision {
+  id        String   @id @default(cuid())
+  postId    String
+  contentMd String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
 }

@@ -118,6 +118,9 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                 ← 返回系列 {post.series.title}
               </Link>
             ) : null}
+            <Link href={`/post/${post.slug}/revisions`} className="underline">
+              查看修订历史
+            </Link>
           </div>
         </footer>
       </article>

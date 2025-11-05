@@ -72,6 +72,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
       await tx.post.update({ where: { id }, data });
 
+      // 如果是已发布文章且正文有变化，创建新 revision
+      if (existing.status === 'PUBLISHED' && parsed.data.contentMd !== undefined && parsed.data.contentMd !== existing.contentMd) {
+        await tx.revision.create({
+          data: {
+            postId: id,
+            contentMd: parsed.data.contentMd,
+          },
+        });
+      }
+
       if (parsed.data.contentMd !== undefined) {
         const siteUrl = process.env.SITE_URL;
         const hashes = extractHashesFromMarkdown(parsed.data.contentMd, siteUrl);

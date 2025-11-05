@@ -187,6 +187,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         },
       });
 
+      // 创建初始 revision
+      await tx.revision.create({
+        data: {
+          postId: id,
+          contentMd: formattedMarkdown,
+        },
+      });
+
       await updateAttachmentBindingsTx(
         tx,
         (freshPost.assetHashes as string[] | null | undefined) ?? [],

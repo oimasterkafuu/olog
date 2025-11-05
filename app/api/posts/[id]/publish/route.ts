@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import pangu from "pangu";
 import { prisma } from "@/lib/db";
 import { jsonError, jsonOk } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-helpers";
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   if (needSummary) {
     try {
-      summaryResult = await callSummary({ title: post.title, markdown: metadataResult.result.revisedMarkdown });
+      summaryResult = await callSummary({ title: post.title, markdown: post.contentMd });
     } catch (error) {
       console.warn("summary generation failed", error);
       summaryWarning = error instanceof Error ? error.message : "AI 摘要生成失败";
@@ -139,8 +140,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
   }
 
+  const formattedMarkdown = pangu.spacingText(post.contentMd);
   const siteUrl = process.env.SITE_URL;
-  const assetHashes = extractHashesFromMarkdown(metadataResult.result.revisedMarkdown, siteUrl);
+  const assetHashes = extractHashesFromMarkdown(formattedMarkdown, siteUrl);
 
   let appliedSlug = post.slug;
 
@@ -176,7 +178,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         where: { id },
         data: {
           slug: finalSlug,
-          contentMd: metadataResult.result.revisedMarkdown,
+          contentMd: formattedMarkdown,
           metaJson: mergedMeta,
           summary: summaryResult?.result.summary ?? post.summary ?? null,
           status: "PUBLISHED",

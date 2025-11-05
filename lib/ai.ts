@@ -15,16 +15,8 @@ interface CostRates {
 const SYSTEM_PROMPT_METADATA = `你是中文技术博客的编辑助手。仅以 JSON 对象输出结果，字段必须齐全且可被机器解析。
 任务：
 1) 从输入的中文技术文章中抽取 5–10 个高价值关键词（名词或术语，去重，避免过长短语）。
-2) 在 Markdown 正文中对重要的部分进行适度加粗，规则：
-   - 用 **粗体** 包裹重要部分的重要出现位置。
-   - 不限于 (1) 中的关键词。
-   - 目的是要便于快速阅读。数量适中或偏多，分布均衡密集。
-   - 不改变语义与断句，不新增段落。
-   - 不在代码块、行内代码、链接 URL、图片语法、表格对齐符内加粗。
-3) 在明显的语法错误、标点错误等位置修复。
-   - 不修改其他位置，尽可能尊重原文。
-4) 当输入中声明 needsSlug=true 且提供的 currentSlug 为形如 post-时间戳 的占位值时，请基于标题与内容生成新的 slug（仅小写字母、数字与短横线，使用简洁英语）；其它情况下不要返回 slug 字段。
-输出：{"keywords": string[], "revisedMarkdown": string, "slug"?: string}`;
+2) 当输入中声明 needsSlug=true 且提供的 currentSlug 为形如 post-时间戳 的占位值时，请基于标题与内容生成新的 slug（仅小写字母、数字与短横线，使用简洁英语）；其它情况下不要返回 slug 字段。
+输出：{"keywords": string[], "slug"?: string}`;
 
 const SYSTEM_PROMPT_SUMMARY = `你是中文技术写作编辑。仅以 JSON 对象输出结果，字段必须齐全且可被机器解析。
 任务：
@@ -51,7 +43,6 @@ export interface PublishMetadataInput {
 
 export interface PublishMetadataResult {
   keywords: string[];
-  revisedMarkdown: string;
   slug?: string;
 }
 
@@ -313,7 +304,6 @@ export async function callPublishMetadata(input: PublishMetadataInput): Promise<
     });
   }
   let keywords: string[];
-  let revisedMarkdown: string;
   let slug: string | undefined;
   const warnings: PublishMetadataWarning[] = [];
   try {
@@ -321,7 +311,6 @@ export async function callPublishMetadata(input: PublishMetadataInput): Promise<
     if (keywords.length < 5 || keywords.length > 10) {
       warnings.push({ type: "keywords-count", message: "AI 返回的关键词数量不符合要求 (5-10 个)" });
     }
-    revisedMarkdown = ensureString(parsed.revisedMarkdown, "revisedMarkdown");
     if (parsed.slug !== undefined) {
       const candidate = ensureString(parsed.slug, "slug");
       if (!/^[a-z0-9-]+$/.test(candidate)) {
@@ -341,7 +330,7 @@ export async function callPublishMetadata(input: PublishMetadataInput): Promise<
 
   const usage = completion.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
-  const result: PublishMetadataResult = { keywords, revisedMarkdown };
+  const result: PublishMetadataResult = { keywords };
   if (slug) {
     result.slug = slug;
   }

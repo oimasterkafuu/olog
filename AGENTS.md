@@ -12,9 +12,10 @@
 - 鉴权：用户名+密码，会话基于 `iron-session`；无需复杂权限模型与角色管理。
 - 文章编辑：Markdown；发布时可选择是否生成摘要（默认开启）。
 - AI 协作：
-  - 元数据关键词提取、Markdown 加粗与摘要生成统一调用 AI 模型（默认 THUDM/GLM-4-32B-0414），按业务场景区分"发布元数据""摘要生成"两类流程。
+  - 元数据关键词提取与摘要生成统一调用 AI 模型（默认 THUDM/GLM-4-32B-0414），按业务场景区分"发布元数据""摘要生成"两类流程。
   - 两类调用均记录至 AIReview，包含模型、用量与成本估算。
   - AI 相关配置（API Key、Base URL、模型名称、费率）存储在数据库中，支持后台管理界面修改。
+- 文本格式化：使用 pangu 自动在中英文间添加空格，发布时应用于正文。
 - 附件管理：基于 SHA256 内容哈希去重存储；文章记录其依赖的哈希；删除文章时解除绑定，清理无引用文件。
 
 不在本期范围：多用户、多语言、外部对象存储、复杂 RBAC、修订历史（Revision 已移除）。
@@ -28,6 +29,7 @@
 - 会话与鉴权：`iron-session`（单用户，用户名/密码）。
 - Markdown 编辑器：`@uiw/react-md-editor`（实时预览）。
 - Markdown 渲染：`remark-gfm`、`rehype-highlight`、`rehype-sanitize`。
+- 文本格式化：`pangu`（自动在中英文间添加空格）。
 - 上传存储：本地文件系统 `public/uploads/`；文件名为 `<sha256>.<ext>`。
 - AI SDK：OpenAI SDK；通过 `OPENAI_BASE_URL` 指向兼容 OpenAI 协议的服务端；启用 `response_format={ type: 'json_object' }` 返回结构化 JSON。
 
@@ -156,21 +158,22 @@
 步骤：
 1) 校验：文章存在、`title/slug/contentMd` 完整、状态为 DRAFT。
 2) AI 模型调用（发布元数据阶段）：
-   - 职责：
-     - 抽取高价值关键词（5–10 个）
-     - 在 Markdown 原文中对关键词进行"适度加粗"（直接改写原文）
-   - 产出 JSON：`{ keywords: string[], revisedMarkdown: string }`
-   - 持久化：
-     - `Post.contentMd = revisedMarkdown`
-     - `Post.metaJson.tags = keywords`
+   - 职责：抽取高价值关键词（5–10 个）
+   - 输入：原始 Markdown 正文
+   - 产出 JSON：`{ keywords: string[], slug?: string }`
+   - 持久化：`Post.metaJson.tags = keywords`
    - 记录 AIReview(kind = PUBLISH_METADATA)
 3) AI 模型调用（摘要阶段，当 needSummary = true）：
    - 职责：生成单段中文摘要（80–150 字），允许 **加粗**，禁止列表/多段。
+   - 输入：原始 Markdown 正文（未格式化）
    - 产出 JSON：`{ summary: string }`
    - 持久化：`Post.summary = summary`
    - 记录 AIReview(kind = SUMMARY)
-4) 状态迁移：`Post.status = PUBLISHED`，`Post.publishedAt = now()`。
-5) 异常策略：
+4) 文本格式化（Pangu）：
+   - 使用 pangu 对原始 Markdown 正文进行格式化（自动在中英文间添加空格）
+   - 持久化：`Post.contentMd = 格式化后的内容`
+5) 状态迁移：`Post.status = PUBLISHED`，`Post.publishedAt = now()`。
+6) 异常策略：
    - 元数据阶段返回非 JSON 或内容不合规：终止发布并报错；文章不被修改。
    - 摘要阶段失败：继续发布但不写摘要（返回告警）。
 
@@ -184,20 +187,15 @@
 - 统一采样参数：`temperature=0.7`、`top_p=0.7`、`frequency_penalty=0.3`、`top_k=50`；发布元数据阶段 `max_tokens=8192`，摘要阶段 `max_tokens=8192`。
 - 默认模型：THUDM/GLM-4-32B-0414（可通过后台配置修改）。
 
-元数据处理：关键词提取 + Markdown 加粗
+元数据处理：关键词提取
 
 提示模板（拼入 user 消息）：
 ```
 你是中文技术博客的编辑助手。仅以 JSON 对象输出结果，字段必须齐全且可被机器解析。
 任务：
 1) 从输入的中文技术文章中抽取 5–10 个高价值关键词（名词或术语，去重，避免过长短语）。
-2) 在 Markdown 正文中对重要的部分进行适度加粗，规则：
-   - 用 **粗体** 包裹重要部分的重要出现位置。
-   - 不限于 (1) 中的关键词。
-   - 目的是要便于快速阅读。数量要适中，分布均衡。
-   - 不改变语义与断句，不新增段落。
-   - 不在代码块、行内代码、链接 URL、图片语法、表格对齐符内加粗。
-输出：{"keywords": string[], "revisedMarkdown": string}
+2) 当输入中声明 needsSlug=true 且提供的 currentSlug 为形如 post-时间戳 的占位值时，请基于标题与内容生成新的 slug（仅小写字母、数字与短横线，使用简洁英语）；其它情况下不要返回 slug 字段。
+输出：{"keywords": string[], "slug"?: string}
 ```
 
 User 内容（建议 JSON 包裹原文）：
@@ -609,7 +607,11 @@ const res = await fetch(chatCompletionEndpoint, {
     top_k: 50
   })
 })
-// 解析 JSON：{ keywords, revisedMarkdown }
+// 解析 JSON：{ keywords, slug? }
+
+// Pangu 格式化（发布时应用）
+import pangu from 'pangu'
+const formattedMarkdown = pangu.spacingText(markdown)
 ```
 
 摘要生成：

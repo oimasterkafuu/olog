@@ -665,3 +665,162 @@ await prisma.aIReview.create({
 分支与评审（可选）：
 - 默认 `main`；较大改动走功能分支 `feat/<module>-<short>`，合并前自测并补充文档。
 - PR/变更说明以本文档为基准，若存在偏差需在说明中明确原因。
+
+
+## 17. 常见问题与最佳实践
+
+### 17.1 Prisma 与数据库管理
+
+**问题：数据库 Schema 与 Prisma Schema 不同步**
+
+症状：
+- 构建时出现类型错误，如 `Type 'XXX' is not assignable to type 'YYY'`
+- 运行时出现 `Value 'XXX' not found in enum 'YYY'` 错误
+- 数据库中有旧的表或列在 Prisma schema 中不存在
+
+根本原因：
+1. 数据库中存在旧的枚举值、表或列，但 Prisma schema 已更新或删除相关定义
+2. Prisma Client 缓存未更新，与最新 schema 不一致
+3. 存在多个数据库文件（如 `prisma/dev.db` 和 `prisma/prisma/dev.db`）导致混淆
+
+解决方案：
+```bash
+# 1. 重新生成 Prisma Client（修复类型不同步）
+npx prisma generate
+
+# 2. 检查数据库路径配置
+grep DATABASE_URL .env
+# 应该是 file:./prisma/dev.db
+
+# 3. 同步 schema 到数据库（开发环境）
+npx prisma db push --accept-data-loss
+
+# 4. 或运行迁移（生产环境）
+npx prisma migrate deploy
+```
+
+**最佳实践：**
+- 修改 Prisma schema 后立即运行 `npx prisma generate` 更新类型
+- 删除模型或枚举值前，先确认数据库中是否有依赖数据
+- 仅在 `prisma/` 目录下保留一个数据库文件，避免路径混淆
+- 定期运行 `npx prisma db push` 或 `npx prisma migrate dev` 保持同步
+- 构建失败时，首先检查 Prisma Client 是否与 schema 同步
+
+### 17.2 React Hooks 使用规范
+
+**问题：Hooks 在条件语句中调用**
+
+错误示例：
+```typescript
+// ❌ 错误：Hooks 在三元表达式中被条件性调用
+const { savedData, clearSaved } = mode === "create" 
+  ? useAutoSave("draft-post-new", draftData!)
+  : { savedData: null, clearSaved: () => {} };
+```
+
+React 规则：**Hooks 必须在组件顶层调用，不能在条件语句、循环或嵌套函数中调用**。
+
+正确示例：
+```typescript
+// ✅ 正确：总是调用 Hook，根据条件决定参数或使用返回值
+const autoSaveResult = useAutoSave(
+  "draft-post-new", 
+  mode === "create" ? draftData! : null
+);
+const { savedData, clearSaved } = mode === "create" 
+  ? autoSaveResult
+  : { savedData: null, clearSaved: () => {} };
+```
+
+**最佳实践：**
+- 所有 Hooks 调用必须在组件的顶层，不受条件控制
+- 使用条件参数（如 `null`、`undefined`）而非条件性调用
+- 在自定义 Hook 中处理条件逻辑，而非在调用处
+- 启用 ESLint 的 `react-hooks/rules-of-hooks` 规则并及时修复警告
+
+### 17.3 异步函数调用规范
+
+**问题：异步函数缺少 await**
+
+错误示例：
+```typescript
+// ❌ 错误：calcCostForAI 返回 Promise，但缺少 await
+cost: calcCostForAI(ctx.usage ?? {}) ?? undefined,
+```
+
+症状：
+- TypeScript 编译错误：`Type 'Promise<T>' is not assignable to type 'T'`
+- 运行时 `cost` 值为 `[object Promise]` 而非实际数值
+
+正确示例：
+```typescript
+// ✅ 正确：使用 await 等待 Promise 完成
+cost: (await calcCostForAI(ctx.usage ?? {})) ?? undefined,
+```
+
+**最佳实践：**
+- 调用返回 `Promise` 的函数必须使用 `await` 或 `.then()`
+- 在 TypeScript 中启用严格模式，尽早发现类型错误
+- 函数命名清晰表明是否异步（如 `calcCostForAI` vs `calcCostFromUsage`）
+- 对于异步操作密集的代码，考虑使用 `Promise.all()` 并行化
+
+### 17.4 useCallback 依赖项管理
+
+**问题：useCallback 依赖数组不完整**
+
+症状：
+- ESLint 警告：`React Hook useCallback has a missing dependency`
+- 函数闭包捕获过期的状态或函数引用
+- 运行时行为不符合预期
+
+解决方案：
+```typescript
+// 将回调中使用的所有外部变量和函数都加入依赖数组
+const handleSubmit = useCallback(async () => {
+  // 使用了 uploadPendingImages、pendingImages、router 等
+  const urlMap = await uploadPendingImages(postId);
+  // ...
+}, [
+  // 所有使用的外部依赖
+  mode, disabled, title, content, autoSummary, hidden, 
+  seriesId, slug, post?.id, pendingImages, router, 
+  clearSaved, uploadPendingImages  // ← 不要遗漏
+]);
+```
+
+**最佳实践：**
+- 启用 ESLint 的 `react-hooks/exhaustive-deps` 规则
+- 不要忽略依赖警告，添加所有使用的外部变量和函数
+- 对于频繁变化的函数依赖，考虑用 `useCallback` 包裹它们
+- 如果依赖数组过长，考虑重构函数逻辑或使用 `useReducer`
+
+### 17.5 构建错误排查流程
+
+当 `pnpm build` 或 `npm run build` 失败时，按以下顺序排查：
+
+1. **类型错误（TypeScript）**
+   - 检查 Prisma Client 是否最新：`npx prisma generate`
+   - 检查依赖包版本是否兼容
+   - 运行 `npx tsc --noEmit` 单独检查类型错误
+
+2. **Linter 错误（ESLint）**
+   - React Hooks 规则：检查是否有条件性调用 Hooks
+   - 依赖数组：检查 `useEffect`/`useCallback` 的依赖是否完整
+   - 未使用的变量：清理或添加 `// eslint-disable-next-line`
+
+3. **运行时错误（构建阶段静态生成）**
+   - 检查数据库连接和数据完整性
+   - 检查环境变量是否完整（`.env` 文件）
+   - 检查 API 路由是否正确实现
+
+4. **数据库相关错误**
+   - 运行 `npx prisma db push` 同步 schema
+   - 检查是否有多个数据库文件
+   - 清理旧的迁移或数据：`npx prisma db push --accept-data-loss`（仅开发环境）
+
+**构建前检查清单：**
+- [ ] 运行 `npx prisma generate` 更新 Prisma Client
+- [ ] 运行 `npx prisma db push` 同步数据库 schema
+- [ ] 运行 `pnpm lint` 或 `npm run lint` 检查代码规范
+- [ ] 确认 `.env` 文件配置完整
+- [ ] 删除 `.next` 缓存后重新构建（如果遇到奇怪的缓存问题）

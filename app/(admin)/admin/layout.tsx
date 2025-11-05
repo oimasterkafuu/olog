@@ -27,7 +27,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <div className="flex min-h-screen bg-slate-100">
-      <aside className="hidden w-60 flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="hidden w-60 flex-shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="px-6 py-6">
           <p className="text-lg font-semibold">后台</p>
           <p className="mt-1 text-sm text-slate-500">你好，{session.username}</p>
@@ -43,7 +43,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <LogoutButton />
         </div>
       </aside>
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden">
           <div className="flex items-center gap-3">
             <MobileNav navItems={navItems} />
@@ -54,7 +54,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </div>
           <LogoutButton />
         </header>
-        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+        <main className="flex-1 overflow-x-auto px-4 py-6 md:px-8">{children}</main>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   extractAIContext,
 } from "@/lib/ai";
 import { ensureUniquePostSlug, fallbackSlugFromTitle, isDefaultGeneratedSlug } from "@/lib/slugs";
+import { getConfig } from "@/lib/config";
 
 export const runtime = "nodejs";
 
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 
   const formattedMarkdown = pangu.spacingText(post.contentMd);
-  const siteUrl = process.env.SITE_URL;
+  const siteUrl = await getConfig("SITE_URL");
   const assetHashes = extractHashesFromMarkdown(formattedMarkdown, siteUrl);
 
   let appliedSlug = post.slug;

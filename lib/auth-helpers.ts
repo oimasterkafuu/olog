@@ -9,7 +9,7 @@ export async function requireAuth(request?: NextRequest) {
     return { session, response: jsonError("请先登录", { status: 401 }) } as const;
   }
 
-  if (request && request.method !== "GET" && !ensureCsrf(request)) {
+  if (request && request.method !== "GET" && !(await ensureCsrf(request))) {
     return { session, response: jsonError("请求来源不合法", { status: 403 }) } as const;
   }
 

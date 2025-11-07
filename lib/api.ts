@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getConfig } from "./config";
 
 export interface ApiSuccess<T> {
   ok: true;
@@ -25,10 +26,10 @@ export function jsonError(message: string, init?: ResponseInit) {
   return NextResponse.json(body, { ...init, status });
 }
 
-export function ensureCsrf(request: NextRequest): boolean {
+export async function ensureCsrf(request: NextRequest): Promise<boolean> {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
-  const siteUrl = process.env.SITE_URL;
+  const siteUrl = await getConfig("SITE_URL");
 
   if (!siteUrl) {
     return true;

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { jsonError, jsonOk } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-helpers";
 import { extractHashesFromMarkdown, updateAttachmentBindingsTx, removeAllAttachmentsForPostWithinTx } from "@/lib/attachments";
+import { getConfig } from "@/lib/config";
 
 const updateSchema = z
   .object({
@@ -83,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
 
       if (parsed.data.contentMd !== undefined) {
-        const siteUrl = process.env.SITE_URL;
+        const siteUrl = await getConfig("SITE_URL");
         const hashes = extractHashesFromMarkdown(parsed.data.contentMd, siteUrl);
         await updateAttachmentBindingsTx(tx, existing.assetHashes as string[] | null | undefined, hashes, id);
       }

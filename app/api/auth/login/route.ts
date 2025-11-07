@@ -11,7 +11,7 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!ensureCsrf(request)) {
+  if (!(await ensureCsrf(request))) {
     return jsonError("请求来源不合法", { status: 403 });
   }
 

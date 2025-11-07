@@ -38,6 +38,7 @@ coverage
 dist
 .turbo
 .next/cache
+*.tsbuildinfo
 
 # SQLite sidecar files
 prisma/*.db-shm

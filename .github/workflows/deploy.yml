@@ -44,13 +44,27 @@ jobs:
             cd ~/olog
             
             echo "==> 停止现有 Next.js 进程"
-            # 查找并终止占用 3000 端口的进程
-            if lsof -ti:3000 > /dev/null 2>&1; then
-              echo "发现运行中的进程，正在终止..."
-              lsof -ti:3000 | xargs kill -9 || true
-              sleep 2
+            # 使用 pgrep/pkill 查找并终止 next-server 进程
+            if pgrep -f "next-server" > /dev/null 2>&1; then
+              echo "发现运行中的 next-server 进程，正在终止..."
+              pkill -f "next-server" || true
+              sleep 3
+              
+              # 如果进程仍在运行，强制杀死
+              if pgrep -f "next-server" > /dev/null 2>&1; then
+                echo "进程未正常停止，强制终止..."
+                pkill -9 -f "next-server" || true
+                sleep 2
+              fi
+              
+              echo "进程已停止"
             else
-              echo "未发现运行中的进程"
+              echo "未发现运行中的 next-server 进程"
+            fi
+            
+            # 双重保险：如果 3000 端口仍被占用，使用 fuser 杀死
+            if command -v fuser > /dev/null 2>&1; then
+              fuser -k 3000/tcp > /dev/null 2>&1 || true
             fi
             
             echo "==> 拉取最新代码"
@@ -75,10 +89,13 @@ jobs:
             sleep 5
             
             echo "==> 检查服务状态"
-            if lsof -ti:3000 > /dev/null 2>&1; then
+            if pgrep -f "next-server" > /dev/null 2>&1; then
               echo "✓ 部署成功，服务已启动"
+              echo "运行中的进程："
+              ps aux | grep next-server | grep -v grep
             else
               echo "✗ 警告：服务可能未成功启动，请检查日志"
+              tail -n 50 ~/olog/logs/output.log
               exit 1
             fi
 

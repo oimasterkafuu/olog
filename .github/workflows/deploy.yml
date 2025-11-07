@@ -44,28 +44,46 @@ jobs:
             cd ~/olog
             
             echo "==> 停止现有 Next.js 进程"
-            # 使用 pgrep/pkill 查找并终止 next-server 进程
-            if pgrep -f "next-server" > /dev/null 2>&1; then
-              echo "发现运行中的 next-server 进程，正在终止..."
-              pkill -f "next-server" || true
-              sleep 3
-              
-              # 如果进程仍在运行，强制杀死
-              if pgrep -f "next-server" > /dev/null 2>&1; then
-                echo "进程未正常停止，强制终止..."
-                pkill -9 -f "next-server" || true
-                sleep 2
+            PID_FILE=~/olog/next-server.pid
+            
+            # 方案1：从 PID 文件读取进程 ID
+            if [ -f "$PID_FILE" ]; then
+              OLD_PID=$(cat "$PID_FILE")
+              if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+                echo "从 PID 文件发现进程 $OLD_PID，正在终止..."
+                kill -TERM "$OLD_PID" 2>/dev/null || true
+                sleep 3
+                
+                # 如果还在运行，强制终止
+                if kill -0 "$OLD_PID" 2>/dev/null; then
+                  echo "进程 $OLD_PID 未正常停止，强制终止..."
+                  kill -9 "$OLD_PID" 2>/dev/null || true
+                  sleep 1
+                fi
+                echo "进程 $OLD_PID 已停止"
+              else
+                echo "PID 文件中的进程 $OLD_PID 不存在"
               fi
-              
-              echo "进程已停止"
+              rm -f "$PID_FILE"
             else
-              echo "未发现运行中的 next-server 进程"
+              echo "未发现 PID 文件"
             fi
             
-            # 双重保险：如果 3000 端口仍被占用，使用 fuser 杀死
-            if command -v fuser > /dev/null 2>&1; then
-              fuser -k 3000/tcp > /dev/null 2>&1 || true
+            # 方案2：查找可能残留的 next-server 进程（更精确的匹配）
+            # 使用 grep 过滤，避免匹配到 SSH 进程或其他无关进程
+            if ps aux | grep -E 'node.*next-server|next start' | grep -v grep | grep -v ssh > /dev/null; then
+              echo "发现残留的 next-server 进程："
+              ps aux | grep -E 'node.*next-server|next start' | grep -v grep | grep -v ssh
+              
+              # 逐个终止（更安全）
+              ps aux | grep -E 'node.*next-server|next start' | grep -v grep | grep -v ssh | awk '{print $2}' | while read pid; do
+                echo "终止残留进程 $pid"
+                kill -TERM "$pid" 2>/dev/null || true
+              done
+              sleep 2
             fi
+            
+            echo "所有旧进程已清理完毕"
             
             echo "==> 拉取最新代码"
             git pull origin main
@@ -83,18 +101,28 @@ jobs:
             mkdir -p ~/olog/logs
             
             echo "==> 后台启动服务"
+            # 启动服务并保存 PID
             nohup npm run start > ~/olog/logs/output.log 2>&1 &
+            echo $! > ~/olog/next-server.pid
+            echo "服务已启动，PID: $(cat ~/olog/next-server.pid)"
             
             echo "==> 等待服务启动"
             sleep 5
             
             echo "==> 检查服务状态"
-            if pgrep -f "next-server" > /dev/null 2>&1; then
-              echo "✓ 部署成功，服务已启动"
-              echo "运行中的进程："
-              ps aux | grep next-server | grep -v grep
+            if [ -f ~/olog/next-server.pid ]; then
+              NEW_PID=$(cat ~/olog/next-server.pid)
+              if kill -0 "$NEW_PID" 2>/dev/null; then
+                echo "✓ 部署成功，服务已启动"
+                echo "运行中的进程 (PID: $NEW_PID):"
+                ps -p "$NEW_PID" -o pid,ppid,cmd,etime
+              else
+                echo "✗ 警告：服务启动失败，进程 $NEW_PID 不存在"
+                tail -n 50 ~/olog/logs/output.log
+                exit 1
+              fi
             else
-              echo "✗ 警告：服务可能未成功启动，请检查日志"
+              echo "✗ 警告：未找到 PID 文件"
               tail -n 50 ~/olog/logs/output.log
               exit 1
             fi

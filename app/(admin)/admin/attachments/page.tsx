@@ -26,6 +26,7 @@ export default function AttachmentsPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ export default function AttachmentsPage() {
 
     try {
       setDeletingId(sha256);
+      setMessage(null);
       const res = await fetch(`/api/attachments?sha256=${encodeURIComponent(sha256)}`, {
         method: "DELETE",
       });
@@ -68,10 +70,11 @@ export default function AttachmentsPage() {
         throw new Error(data.error || "删除失败");
       }
       
+      setMessage({ type: "success", text: "删除成功" });
       // 重新加载列表
       await loadAttachments();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "删除附件失败");
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "删除附件失败" });
     } finally {
       setDeletingId(null);
     }
@@ -230,6 +233,16 @@ export default function AttachmentsPage() {
       {error && (
         <div className="rounded-lg border border-slate-300 bg-slate-100 p-3 text-sm text-slate-800">
           {error}
+        </div>
+      )}
+
+      {message && (
+        <div className={`rounded-lg border p-3 text-sm ${
+          message.type === "error" 
+            ? "border-red-200 bg-red-50 text-red-800" 
+            : "border-green-200 bg-green-50 text-green-800"
+        }`}>
+          {message.text}
         </div>
       )}
 

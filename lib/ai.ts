@@ -217,13 +217,31 @@ interface ChatCompletionResponse {
   usage?: Usage;
 }
 
+interface RequestChatOptions {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  maxTokens: number;
+  inputHash: string;
+  jsonMode?: boolean; // 是否使用 JSON 模式
+}
+
 async function requestChatCompletion(params: {
   model: string;
   prompt: string;
   maxTokens: number;
   inputHash: string;
 }): Promise<ChatCompletionResponse> {
-  const { model, prompt, maxTokens, inputHash } = params;
+  return requestChatCompletionWithMessages({
+    model: params.model,
+    messages: [{ role: "user", content: params.prompt }],
+    maxTokens: params.maxTokens,
+    inputHash: params.inputHash,
+    jsonMode: true,
+  });
+}
+
+async function requestChatCompletionWithMessages(options: RequestChatOptions): Promise<ChatCompletionResponse> {
+  const { model, messages, maxTokens, inputHash, jsonMode = false } = options;
 
   const apiKey = await getConfig("OPENAI_API_KEY");
   if (!apiKey) {
@@ -239,24 +257,23 @@ async function requestChatCompletion(params: {
   try {
     endpoint = new URL("chat/completions", baseUrl).toString();
   } catch (error) {
-    attachAIContext(error, { model, inputHash, prompt });
+    attachAIContext(error, { model, inputHash, prompt: JSON.stringify(messages) });
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     model,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
+    messages,
     max_tokens: maxTokens,
     temperature: COMMON_CHAT_PARAMS.temperature,
     top_p: COMMON_CHAT_PARAMS.top_p,
     frequency_penalty: COMMON_CHAT_PARAMS.frequency_penalty,
     top_k: COMMON_CHAT_PARAMS.top_k,
-    response_format: { type: "json_object" },
   };
+
+  // 仅在需要时添加 JSON 模式
+  if (jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
 
   let response: Response;
   try {
@@ -269,14 +286,14 @@ async function requestChatCompletion(params: {
       body: JSON.stringify(body),
     });
   } catch (error) {
-    attachAIContext(error, { model, inputHash, prompt });
+    attachAIContext(error, { model, inputHash, prompt: JSON.stringify(messages) });
   }
 
   let responseText: string;
   try {
     responseText = await response.text();
   } catch (error) {
-    attachAIContext(error, { model, inputHash, status: response.status, prompt });
+    attachAIContext(error, { model, inputHash, status: response.status, prompt: JSON.stringify(messages) });
   }
 
   let parsed: unknown = null;
@@ -307,7 +324,7 @@ async function requestChatCompletion(params: {
       inputHash,
       rawText: responseText,
       status: response.status,
-      prompt,
+      prompt: JSON.stringify(messages),
     });
   }
 
@@ -318,7 +335,7 @@ async function requestChatCompletion(params: {
       inputHash,
       rawText: responseText,
       status: response.status,
-      prompt,
+      prompt: JSON.stringify(messages),
     });
   }
 
@@ -509,4 +526,340 @@ function calcCostFromUsage(usage: Usage, rates: CostRates): number | null {
 
 export async function calcCostForAI(usage: Usage): Promise<number | null> {
   return calcCostFromUsage(usage, await getAIRates());
+}
+
+// ============================================================================
+// 日记相关 AI 功能
+// ============================================================================
+
+const SYSTEM_PROMPT_DIARY_ASSISTANT = `你是一位温暖、善于倾听的日记助手，帮助用户记录和反思今天的生活。
+今天是：${new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
+
+对话策略（共20轮）：
+1. 开场（第1-2轮）：用简短亲切的语气打招呼，询问用户今天过得怎么样
+2. 深入（第3-15轮）：根据用户分享，表达共情并追问细节、感受或反思，帮助用户更深入表达
+3. 提醒（第16-18轮）：在继续深入的同时，温和提醒用户"我们还有X次对话机会"
+4. 结束（第19-20轮）：感谢用户的分享，告诉用户对话即将结束，现在可以生成日记了
+
+对话要求：
+- 每次回复简洁温暖（1-3句话），不要使用列表
+- 根据用户情绪调整回应：开心时共鸣，难过时安慰，困惑时引导
+- 追问要自然有针对性，不要一次问太多问题
+- 在第16轮后，自然地提及剩余轮次，但不要显得着急
+- 在第19-20轮时，明确表达"这是我们的最后几次对话机会了，现在可以生成日记了"
+
+注意：
+- 当前轮次和剩余轮次会在消息中告知你
+- 输出纯文本，保持对话式语气
+- 避免说教或评判，专注于倾听和引导`;
+
+/**
+ * 生成日记文章的系统提示词
+ * @param diaryDate 日记日期（YYYY-MM-DD）
+ */
+function getSystemPromptDiaryGenerate(diaryDate: string): string {
+  const date = new Date(diaryDate);
+  const formattedDate = date.toLocaleDateString("zh-CN", { 
+    year: "numeric", 
+    month: "long", 
+    day: "numeric", 
+    weekday: "long" 
+  });
+
+  return `你是专业的日记写作助手。根据用户与你的对话记录，生成一篇 400 字左右的日记文章。
+这篇日记记录的日期是：${formattedDate}（${diaryDate}）
+
+要求：
+1. **只需编写日记正文内容**，不要包含标题、日期等元数据
+2. 使用第一人称"我"的视角
+3. 自然流畅，有个人色彩和真实感
+4. 包含具体事件、细节和真实感受
+5. 结构完整：可以有开头、主体、结尾的自然过渡
+6. 长度控制在 350-450 字之间
+7. 使用 Markdown 格式 
+8. 禁止使用列表格式（- 或数字列表）
+9. 以 JSON 格式输出：{"content": "日记正文"}
+
+注意：
+- 保留对话中用户分享的关键信息和情绪
+- 不要编造对话中未提及的内容
+- 语气要符合用户在对话中的风格（轻松/严肃/反思等）
+- 日记应该读起来像用户自己写的，而不是旁观者叙述
+- 直接开始正文，不要写"今天是..."、"日期：..."等标注`;
+}
+
+const SYSTEM_PROMPT_DIARY_WEEKLY = `你是专业的周记写作助手。根据用户这一周的多篇日记，生成一篇 500-600 字的周总结。
+
+要求：
+1. 使用第一人称"我"的视角
+2. 提炼本周的关键主题、重要事件和整体感受
+3. 可以梳理本周的变化、收获、思考或未完成的事
+4. 结构完整，有一定深度和反思性
+5. 长度控制在 500-600 字之间
+6. 使用 Markdown 格式
+7. 可以使用自然段落划分，但禁止使用列表格式
+8. 以 JSON 格式输出：{"content": "周总结正文"}
+
+注意：
+- 不要简单罗列每天做了什么
+- 寻找本周的线索和主题，进行归纳和思考
+- 语气要有温度和深度，既总结也反思
+- 如果某天的日记情绪明显，在总结中体现情绪变化`;
+
+export interface DiaryMessage {
+  role: "USER" | "ASSISTANT";
+  content: string;
+}
+
+export interface DiaryChatResult extends AIUsageInfo {
+  content: string;
+  rawText: string;
+}
+
+export interface DiaryGenerateResult extends AIUsageInfo {
+  content: string;
+  rawText: string;
+}
+
+export interface DiaryWeeklySummaryResult extends AIUsageInfo {
+  content: string;
+  rawText: string;
+}
+
+/**
+ * 生成日记开场白
+ */
+export async function callDiaryStart(): Promise<DiaryChatResult> {
+  const inputHash = hashInput({ action: "diary_start", timestamp: Date.now() });
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
+
+  const messages = [
+    {
+      role: "system",
+      content: SYSTEM_PROMPT_DIARY_ASSISTANT,
+    },
+    {
+      role: "user",
+      content: "嗨，我想开始写今天的日记。（这是第1轮对话）",
+    },
+  ];
+
+  const completion = await requestChatCompletionWithMessages({
+    model,
+    messages,
+    maxTokens: 256,
+    inputHash,
+    jsonMode: false, // 对话返回纯文本
+  });
+
+  const content = completion.choices[0]?.message?.content?.trim();
+  if (!content) {
+    attachAIContext(new Error("AI 未返回任何内容"), {
+      model,
+      inputHash,
+      usage: completion.usage ?? undefined,
+      prompt: JSON.stringify(messages),
+    });
+  }
+
+  const usage = completion.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+  return {
+    model: completion.model,
+    usage,
+    inputHash,
+    prompt: JSON.stringify(messages),
+    content,
+    rawText: content,
+  };
+}
+
+/**
+ * 日记对话（AI 回复用户消息）
+ * @param messages 对话历史（最近 20 条消息）
+ */
+export async function callDiaryChat(messages: DiaryMessage[]): Promise<DiaryChatResult> {
+  const inputHash = hashInput({ messages });
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
+
+  // 计算当前轮次（用户消息数）
+  const userMessageCount = messages.filter((m) => m.role === "USER").length;
+  const currentRound = userMessageCount + 1;
+  const maxRounds = 20;
+  const remainingRounds = maxRounds - currentRound;
+
+  // 构建标准的 messages 数组
+  const chatMessages = [
+    {
+      role: "system",
+      content: SYSTEM_PROMPT_DIARY_ASSISTANT,
+    },
+    ...messages.map((msg) => ({
+      role: msg.role === "USER" ? "user" : "assistant",
+      content: msg.content,
+    })),
+  ];
+
+  // 在用户最后一条消息后添加轮次提示
+  const lastUserMsgIndex = chatMessages.map((m) => m.role).lastIndexOf("user");
+  if (lastUserMsgIndex !== -1) {
+    let roundInfo = `（这是第${currentRound}轮对话`;
+    if (remainingRounds > 0) {
+      roundInfo += `，还剩${remainingRounds}轮`;
+    } else {
+      roundInfo += `，这是最后一轮`;
+    }
+    roundInfo += `）`;
+    chatMessages[lastUserMsgIndex].content += `\n\n${roundInfo}`;
+  }
+
+  const completion = await requestChatCompletionWithMessages({
+    model,
+    messages: chatMessages,
+    maxTokens: 512,
+    inputHash,
+    jsonMode: false, // 对话返回纯文本
+  });
+
+  const content = completion.choices[0]?.message?.content?.trim();
+  if (!content) {
+    attachAIContext(new Error("AI 未返回任何内容"), {
+      model,
+      inputHash,
+      usage: completion.usage ?? undefined,
+      prompt: JSON.stringify(chatMessages),
+    });
+  }
+
+  const usage = completion.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+  return {
+    model: completion.model,
+    usage,
+    inputHash,
+    prompt: JSON.stringify(chatMessages),
+    content,
+    rawText: content,
+  };
+}
+
+/**
+ * 生成日记文章（400 字）
+ * @param messages 完整对话历史
+ * @param diaryDate 日记日期（YYYY-MM-DD）
+ */
+export async function callDiaryGenerate(
+  messages: DiaryMessage[], 
+  diaryDate: string
+): Promise<DiaryGenerateResult> {
+  const conversationText = messages
+    .map((msg) => `${msg.role === "USER" ? "用户" : "助手"}：${msg.content}`)
+    .join("\n\n");
+
+  const systemPrompt = getSystemPromptDiaryGenerate(diaryDate);
+  const prompt = `${systemPrompt}\n\n对话记录：\n${conversationText}`;
+  const inputHash = hashInput({ action: "generate", messages, diaryDate });
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
+
+  const completion = await requestChatCompletion({
+    model,
+    prompt,
+    maxTokens: 2048,
+    inputHash,
+  });
+
+  const rawText = completion.choices[0]?.message?.content?.trim();
+  if (!rawText) {
+    attachAIContext(new Error("AI 未返回任何内容"), {
+      model,
+      inputHash,
+      usage: completion.usage ?? undefined,
+      prompt,
+    });
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    const jsonText = extractLargestJsonObject(rawText);
+    parsed = JSON.parse(jsonText) as Record<string, unknown>;
+  } catch (error) {
+    attachAIContext(error, {
+      model,
+      inputHash,
+      rawText,
+      usage: completion.usage ?? undefined,
+      prompt,
+    });
+  }
+
+  const content = ensureString(parsed.content, "content");
+  const usage = completion.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+  return {
+    model: completion.model,
+    usage,
+    inputHash,
+    prompt,
+    content,
+    rawText,
+  };
+}
+
+/**
+ * 生成周总结
+ * @param diaries 本周的日记数据（包含 diaryDate 和 summaryMd）
+ */
+export async function callDiaryWeeklySummary(
+  diaries: Array<{ diaryDate: string; summaryMd: string }>
+): Promise<DiaryWeeklySummaryResult> {
+  const diariesText = diaries
+    .map((d) => `【${d.diaryDate}】\n${d.summaryMd}`)
+    .join("\n\n---\n\n");
+
+  const prompt = `${SYSTEM_PROMPT_DIARY_WEEKLY}\n\n本周日记：\n${diariesText}`;
+  const inputHash = hashInput({ action: "weekly", diaries });
+  const model = (await getConfig("MODEL_NAME")) || "Qwen/Qwen3-235B-A22B-Instruct-2507";
+
+  const completion = await requestChatCompletion({
+    model,
+    prompt,
+    maxTokens: 2048,
+    inputHash,
+  });
+
+  const rawText = completion.choices[0]?.message?.content?.trim();
+  if (!rawText) {
+    attachAIContext(new Error("AI 未返回任何内容"), {
+      model,
+      inputHash,
+      usage: completion.usage ?? undefined,
+      prompt,
+    });
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    const jsonText = extractLargestJsonObject(rawText);
+    parsed = JSON.parse(jsonText) as Record<string, unknown>;
+  } catch (error) {
+    attachAIContext(error, {
+      model,
+      inputHash,
+      rawText,
+      usage: completion.usage ?? undefined,
+      prompt,
+    });
+  }
+
+  const content = ensureString(parsed.content, "content");
+  const usage = completion.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+  return {
+    model: completion.model,
+    usage,
+    inputHash,
+    prompt,
+    content,
+    rawText,
+  };
 }

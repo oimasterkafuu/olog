@@ -12,9 +12,23 @@ enum PostStatus {
   PUBLISHED
 }
 
+enum DiaryStatus {
+  CHATTING
+  GENERATED
+  PUBLISHED
+}
+
+enum DiaryMessageRole {
+  USER
+  ASSISTANT
+}
+
 enum AIReviewKind {
   PUBLISH_METADATA
   SUMMARY
+  DIARY_CHAT
+  DIARY_SUMMARY
+  DIARY_WEEKLY
 }
 
 model User {
@@ -69,7 +83,8 @@ model Attachment {
 
 model AIReview {
   id           String       @id @default(cuid())
-  postId       String
+  postId       String?
+  diaryId      String?
   kind         AIReviewKind
   model        String
   prompt       String?
@@ -82,7 +97,8 @@ model AIReview {
   /// 费用估算（存储为浮点数，SQLite 不支持 Decimal）
   cost         Float?
   createdAt    DateTime     @default(now())
-  post         Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post         Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  diary        Diary?       @relation(fields: [diaryId], references: [id], onDelete: Cascade)
 }
 
 model Config {
@@ -100,4 +116,32 @@ model Revision {
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt])
+}
+
+model Diary {
+  id              String        @id @default(cuid())
+  diaryDate       String        @unique
+  status          DiaryStatus   @default(CHATTING)
+  summaryMd       String?
+  isWeeklySummary Boolean       @default(false)
+  weekIdentifier  String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  publishedAt     DateTime?
+  messages        DiaryMessage[]
+  aiReviews       AIReview[]
+
+  @@index([diaryDate])
+  @@index([weekIdentifier])
+}
+
+model DiaryMessage {
+  id        String          @id @default(cuid())
+  diaryId   String
+  role      DiaryMessageRole
+  content   String
+  createdAt DateTime        @default(now())
+  diary     Diary           @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+
+  @@index([diaryId, createdAt])
 }

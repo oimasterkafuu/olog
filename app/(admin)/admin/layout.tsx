@@ -12,6 +12,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "仪表盘", href: "/admin" },
+  { name: "日记管理", href: "/admin/diary" },
   { name: "文章管理", href: "/admin/posts" },
   { name: "系列管理", href: "/admin/series" },
   { name: "附件管理", href: "/admin/attachments" },

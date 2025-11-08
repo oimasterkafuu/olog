@@ -14,8 +14,21 @@ const formatter = new Intl.DateTimeFormat("zh-CN", {
   second: "2-digit",
 });
 
-function translateKind(kind: "PUBLISH_METADATA" | "SUMMARY") {
-  return kind === "PUBLISH_METADATA" ? "发布元数据" : "摘要生成";
+function translateKind(kind: "PUBLISH_METADATA" | "SUMMARY" | "DIARY_CHAT" | "DIARY_SUMMARY" | "DIARY_WEEKLY") {
+  switch (kind) {
+    case "PUBLISH_METADATA":
+      return "发布元数据";
+    case "SUMMARY":
+      return "摘要生成";
+    case "DIARY_CHAT":
+      return "日记对话";
+    case "DIARY_SUMMARY":
+      return "日记生成";
+    case "DIARY_WEEKLY":
+      return "周总结";
+    default:
+      return kind;
+  }
 }
 
 async function getRecentReviews() {
@@ -28,6 +41,13 @@ async function getRecentReviews() {
           id: true,
           title: true,
           slug: true,
+        },
+      },
+      diary: {
+        select: {
+          id: true,
+          diaryDate: true,
+          isWeeklySummary: true,
         },
       },
     },
@@ -56,18 +76,44 @@ export default async function AdminAIReviewPage() {
         columns={[
           {
             id: "post",
-            header: "文章",
+            header: "关联内容",
             accessor: (review) => (
               <div className="space-y-1">
-                <div className="font-medium text-slate-900">{review.post?.title ?? "-"}</div>
-                <div className="text-xs text-slate-400">{review.post?.slug ?? review.postId}</div>
+                {review.post ? (
+                  <>
+                    <div className="font-medium text-slate-900">{review.post.title}</div>
+                    <div className="text-xs text-slate-400">{review.post.slug}</div>
+                  </>
+                ) : review.diary ? (
+                  <>
+                    <div className="font-medium text-slate-900">
+                      {review.diary.isWeeklySummary ? "周总结" : "日记"}
+                    </div>
+                    <div className="text-xs text-slate-400">{review.diary.diaryDate}</div>
+                  </>
+                ) : (
+                  <div className="text-slate-400">-</div>
+                )}
               </div>
             ),
             mobile: "primary",
             mobileAccessor: (review) => (
               <div className="space-y-2">
-                <div className="text-base font-medium text-slate-900">{review.post?.title ?? "-"}</div>
-                <div className="text-xs text-slate-500">{review.post?.slug ?? review.postId}</div>
+                {review.post ? (
+                  <>
+                    <div className="text-base font-medium text-slate-900">{review.post.title}</div>
+                    <div className="text-xs text-slate-500">{review.post.slug}</div>
+                  </>
+                ) : review.diary ? (
+                  <>
+                    <div className="text-base font-medium text-slate-900">
+                      {review.diary.isWeeklySummary ? "周总结" : "日记"}
+                    </div>
+                    <div className="text-xs text-slate-500">{review.diary.diaryDate}</div>
+                  </>
+                ) : (
+                  <div className="text-slate-400">-</div>
+                )}
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500">
                   <span>{translateKind(review.kind)}</span>
                   <StatusPill ok={review.ok} />

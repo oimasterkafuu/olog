@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getDiaryDate } from "@/lib/diary-date";
 
+// 强制动态路由（因为使用了 session/cookies）
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/diary/today
  * 获取今天的日记

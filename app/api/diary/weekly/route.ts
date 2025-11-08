@@ -103,9 +103,9 @@ export async function POST(req: NextRequest) {
             publishedAt: new Date(),
           },
         });
-      } catch (createError: any) {
+      } catch (createError: unknown) {
         // 捕获唯一约束冲突（并发情况）
-        if (createError.code === "P2002") {
+        if (createError && typeof createError === 'object' && 'code' in createError && createError.code === "P2002") {
           return NextResponse.json(
             { ok: false, error: "该周的周总结已存在（并发创建）" },
             { status: 409 }

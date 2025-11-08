@@ -152,7 +152,7 @@ export function PostEditorForm({ mode, post, seriesOptions, disabled = false }: 
   };
 
   // 上传所有 pending 图片
-  const uploadPendingImages = async (postId: string): Promise<Map<string, string>> => {
+  const uploadPendingImages = useCallback(async (postId: string): Promise<Map<string, string>> => {
     const urlMap = new Map<string, string>();
     
     for (const pendingImage of pendingImages) {
@@ -180,7 +180,7 @@ export function PostEditorForm({ mode, post, seriesOptions, disabled = false }: 
     }
 
     return urlMap;
-  };
+  }, [pendingImages]);
 
   // 替换 Markdown 中的占位符
   const replacePlaceholders = (markdown: string, urlMap: Map<string, string>): string => {

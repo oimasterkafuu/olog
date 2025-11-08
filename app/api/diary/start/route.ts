@@ -22,7 +22,7 @@ export async function POST() {
     const weekIdentifier = getWeekIdentifier(diaryDate);
 
     // 检查今天是否已有日记（含消息）
-    let existing = await prisma.diary.findUnique({
+    const existing = await prisma.diary.findUnique({
       where: { diaryDate },
       include: {
         messages: {

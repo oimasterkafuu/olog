@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ResponsiveTable, type ResponsiveTableColumn } from "@/components/responsive-table";
 
 interface AttachmentPost {
@@ -106,9 +107,11 @@ export default function AttachmentsPage() {
       accessor: (attachment) => {
         if (attachment.mime.startsWith("image/")) {
           return (
-            <img
+            <Image
               src={attachment.path}
               alt="preview"
+              width={64}
+              height={64}
               className="h-16 w-16 rounded border border-slate-200 object-cover"
             />
           );
